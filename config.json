@@ -1,0 +1,10 @@
+{
+  "video_source": "sample.mp4",
+  "frame_skip_interval": 15,
+  "similarity_threshold": 0.35,
+  "exit_timeout_frames": 30,
+  "log_dir": "logs",
+  "db_path": "db/faces.db",
+  "detection_confidence": 0.5,
+  "imgsz": 640
+}

@@ -1,0 +1,10 @@
+venv/
+db/*.db
+logs/*.log
+logs/entries/*
+logs/exits/*
+*.pt
+__pycache__/
+.insightface/
+.DS_Store
+*.pyc

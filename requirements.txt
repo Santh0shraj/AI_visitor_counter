@@ -1,0 +1,7 @@
+opencv-python
+insightface
+onnxruntime
+numpy
+scipy
+flask
+ultralytics
