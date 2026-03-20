@@ -41,11 +41,15 @@ def get_recent_events(limit=10):
         rows = cursor.fetchall()
         events = []
         for row in rows:
+            face_id = row[0]
+            # Get pose count for this face
+            poses = db_manager.get_embedding_count_for_face(face_id)
             events.append({
-                "face_id": row[0],
+                "face_id": face_id,
                 "event_type": row[1],
                 "timestamp": row[2],
-                "image_path": row[3]
+                "image_path": row[3],
+                "poses": poses
             })
         return events
     except sqlite3.Error as e:
@@ -108,6 +112,7 @@ HTML_TEMPLATE = """
             <th>Face ID</th>
             <th>Event Type</th>
             <th>Timestamp</th>
+            <th>Poses Learned</th>
             <th>Image Path</th>
         </tr>
         {% for event in events %}
@@ -115,6 +120,7 @@ HTML_TEMPLATE = """
             <td>{{ event.face_id }}</td>
             <td style="text-transform: uppercase;"><strong>{{ event.event_type }}</strong></td>
             <td>{{ event.timestamp }}</td>
+            <td><span style="background:#def; padding:2px 8px; border-radius:4px;">{{ event.poses }}</span></td>
             <td>{{ event.image_path }}</td>
         </tr>
         {% endfor %}
