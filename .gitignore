@@ -8,3 +8,4 @@ __pycache__/
 .insightface/
 .DS_Store
 *.pyc
+output.mp4

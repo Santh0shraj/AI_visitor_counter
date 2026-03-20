@@ -6,5 +6,7 @@
   "log_dir": "logs",
   "db_path": "db/faces.db",
   "detection_confidence": 0.5,
-  "imgsz": 640
+  "imgsz": 640,
+  "output_video": "output.mp4",
+  "show_display": true
 }
