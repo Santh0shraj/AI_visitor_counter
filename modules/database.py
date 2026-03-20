@@ -45,6 +45,16 @@ class DatabaseManager:
                     first_seen TEXT
                 )
             ''')
+
+            # Create face_embeddings table for pose stability
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS face_embeddings (
+                    embedding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    face_id TEXT,
+                    embedding BLOB,
+                    timestamp TEXT
+                )
+            ''')
             
             # Create events table
             cursor.execute('''
@@ -157,5 +167,47 @@ class DatabaseManager:
             cursor.execute("SELECT 1 FROM faces WHERE face_id = ?", (face_id,))
             result = cursor.fetchone()
             return result is not None
+        finally:
+            conn.close()
+
+    def insert_embedding(self, face_id, embedding_bytes, timestamp):
+        """
+        Saves a specific pose embedding for an existing face ID.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO face_embeddings (face_id, embedding, timestamp) VALUES (?, ?, ?)",
+                (face_id, embedding_bytes, timestamp)
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    def get_all_embeddings_multi(self):
+        """
+        Retrieves ALL stored embeddings (multi-pose) from the database.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT face_id, embedding FROM face_embeddings")
+            return cursor.fetchall()
+        finally:
+            conn.close()
+
+    def get_embedding_count_for_face(self, face_id):
+        """
+        Counts how many unique poses are stored for a specific face.
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM face_embeddings WHERE face_id = ?", (face_id,))
+            return cursor.fetchone()[0]
         finally:
             conn.close()

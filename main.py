@@ -50,10 +50,12 @@ def main():
         
         # Load all embeddings into memory once at startup to avoid per-frame DB lookups
         embedding_cache = {}
-        for face_id, emb_bytes in db_manager.get_all_embeddings():
+        for face_id, emb_bytes in db_manager.get_all_embeddings_multi():
             emb = recognizer.bytes_to_embedding(emb_bytes)
             if emb is not None:
-                embedding_cache[face_id] = emb
+                if face_id not in embedding_cache:
+                    embedding_cache[face_id] = []
+                embedding_cache[face_id].append(emb)
         
         recently_registered = {}  # face_id -> frame_number
         
@@ -98,22 +100,32 @@ def main():
                             best_match_id = None
                             best_similarity = 0.0
                             
-                            # Scour in-memory cache for closest spatial parallel
-                            for stored_face_id, stored_emb in embedding_cache.items():
-                                # Normalize both embeddings before comparison
-                                e1 = embedding / (np.linalg.norm(embedding) + 1e-10)
-                                e2 = stored_emb / (np.linalg.norm(stored_emb) + 1e-10)
-                                sim = float(np.dot(e1, e2))
-                                sim = max(0.0, min(1.0, sim))
-                                if sim > best_similarity:
-                                    best_similarity = sim
-                                    best_match_id = stored_face_id
+                            # Scour in-memory cache for closest spatial parallel across ALL angles
+                            for stored_face_id, stored_embs in embedding_cache.items():
+                                for stored_emb in stored_embs:
+                                    # Normalize both embeddings before comparison
+                                    e1 = embedding / (np.linalg.norm(embedding) + 1e-10)
+                                    e2 = stored_emb / (np.linalg.norm(stored_emb) + 1e-10)
+                                    sim = float(np.dot(e1, e2))
+                                    sim = max(0.0, min(1.0, sim))
+                                    if sim > best_similarity:
+                                        best_similarity = sim
+                                        best_match_id = stored_face_id
                             
                             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             
                             # If similarity clears threshold -> Confirmed Recognition
                             if best_similarity > similarity_threshold and best_match_id is not None:
                                 face_id = best_match_id
+                                
+                                # If matched but from a different angle, store this 
+                                # new embedding to improve future matching
+                                if best_similarity < 0.75:
+                                    emb_bytes = recognizer.embedding_to_bytes(embedding)
+                                    db_manager.insert_embedding(face_id, emb_bytes, current_time)
+                                    if face_id not in embedding_cache:
+                                        embedding_cache[face_id] = []
+                                    embedding_cache[face_id].append(embedding)
                                 
                                 # Scenario: They were recognized but fell dormant (they re-entered frame)
                                 if not tracker.is_active(face_id):
@@ -126,40 +138,41 @@ def main():
                                 # Check if any recently registered face is too close in time
                                 is_duplicate = False
                                 for recent_id, recent_frame in recently_registered.items():
-                                    if frame_number - recent_frame < 30:
+                                    if frame_number - recent_frame < 90:
                                         if recent_id in embedding_cache:
-                                            e1 = embedding / (np.linalg.norm(embedding) + 1e-10)
-                                            e2 = embedding_cache[recent_id] / (np.linalg.norm(embedding_cache[recent_id]) + 1e-10)
-                                            sim = float(np.dot(e1, e2))
-                                            if sim > 0.20:
-                                                is_duplicate = True
-                                                face_id = recent_id
-                                                break
+                                            # Check against ALL angles of the recently registered face
+                                            for recent_emb in embedding_cache[recent_id]:
+                                                e1 = embedding / (np.linalg.norm(embedding) + 1e-10)
+                                                e2 = recent_emb / (np.linalg.norm(recent_emb) + 1e-10)
+                                                sim = float(np.dot(e1, e2))
+                                                if sim > 0.15:
+                                                    is_duplicate = True
+                                                    face_id = recent_id
+                                                    break
+                                        if is_duplicate: break
                                 
                                 if not is_duplicate:
-                                    # Generate a random shortened UUID (8 characters)
                                     face_id = str(uuid.uuid4())[:8]
                                     recently_registered[face_id] = frame_number
-                                    
-                                    # Convert vectors to BLOB layout & record permanently
                                     emb_bytes = recognizer.embedding_to_bytes(embedding)
                                     db_manager.insert_face(face_id, emb_bytes, current_time)
-                                    embedding_cache[face_id] = embedding # Update cache
                                     
-                                    # Cascade logging (REGISTER + ENTRY events) & image caching
+                                    # Also save initial pose to multi-embedding table
+                                    db_manager.insert_embedding(face_id, emb_bytes, current_time)
+                                    if face_id not in embedding_cache:
+                                        embedding_cache[face_id] = []
+                                    embedding_cache[face_id].append(embedding)
+                                    
                                     logger.log_register(face_id)
-                                    entry_img_path = logger.save_face_image(frame, bbox, face_id, "entry")
+                                    entry_img_path = logger.save_face_image(
+                                        frame, bbox, face_id, "entry")
                                     logger.log_entry(face_id, entry_img_path)
-                                    db_manager.insert_event(face_id, "entry", current_time, entry_img_path)
-                                    
-                                    # Document locally in RAM block
+                                    db_manager.insert_event(
+                                        face_id, "entry", current_time, entry_img_path)
                                     counter.register_new_face(face_id)
+                                    tracker.update(face_id, bbox, frame_number)
                                 else:
-                                    # Use the face_id from the recent duplicate
-                                    pass
-                            
-                            # Refresh or initialize tracking timestamp
-                            tracker.update(face_id, bbox, frame_number)
+                                    tracker.update(face_id, bbox, frame_number)
                             
                         except Exception as inner_e:
                             logger.log_info(f"Error handling individual detected bounding box: {inner_e}")

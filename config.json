@@ -1,8 +1,8 @@
 {
   "video_source": "sample.mp4",
-  "frame_skip_interval": 15,
+  "frame_skip_interval": 10,
   "similarity_threshold": 0.35,
-  "exit_timeout_frames": 30,
+  "exit_timeout_frames": 60,
   "log_dir": "logs",
   "db_path": "db/faces.db",
   "detection_confidence": 0.5,

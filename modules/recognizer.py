@@ -16,9 +16,12 @@ class FaceRecognizer:
         Initializes the FaceRecognizer using the ArcFace model strictly on the CPU.
         """
         try:
-            # Initialize InsightFace with buffalo_sc (lighter, CPU-optimized)
-            self.app = FaceAnalysis(name='buffalo_sc', providers=['CPUExecutionProvider'])
-            # Only load the recognition module to save memory and time
+            # Initialize InsightFace with buffalo_l (more accurate)
+            self.app = FaceAnalysis(
+                name='buffalo_l',
+                allowed_modules=['detection', 'recognition'],
+                providers=['CPUExecutionProvider']
+            )
             self.app.prepare(ctx_id=0, det_size=(160, 160))
         except Exception as e:
             logging.error(f"Failed to initialize InsightFace model: {e}")
@@ -59,9 +62,9 @@ class FaceRecognizer:
                 logging.warning("Cropped face region is inherently empty.")
                 return None
             
-            # Resize the crop to maximum 160x160 for faster processing
+            # Resize the crop to maximum 224x224 for better alignment accuracy
             crop_h, crop_w = cropped_face.shape[:2]
-            max_size = 160
+            max_size = 224
             if crop_h > max_size or crop_w > max_size:
                 scale = max_size / max(crop_h, crop_w)
                 new_w = int(crop_w * scale)
