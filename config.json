@@ -8,5 +8,8 @@
   "detection_confidence": 0.5,
   "imgsz": 640,
   "output_video": "output.mp4",
-  "show_display": true
+  "show_display": true,
+  "use_rtsp": false,
+  "rtsp_url": "rtsp://username:password@camera_ip:554/stream",
+  "rtsp_reconnect_attempts": 3
 }

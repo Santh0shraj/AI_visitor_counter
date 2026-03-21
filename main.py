@@ -14,13 +14,20 @@ from modules.recognizer import FaceRecognizer
 from modules.tracker import FaceTracker
 from modules.counter import VisitorCounter
 
+def open_video_source(source, is_rtsp=False):
+    if is_rtsp:
+        cap = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    else:
+        cap = cv2.VideoCapture(source)
+    return cap
+
 def main():
     try:
         # 1. Load configuration variables from config.json
         with open('config.json', 'r') as f:
             config = json.load(f)
 
-        video_source = config.get("video_source", "sample.mp4")
         frame_skip_interval = config.get("frame_skip_interval", 3)
         similarity_threshold = config.get("similarity_threshold", 0.45)
         exit_timeout_frames = config.get("exit_timeout_frames", 30)
@@ -31,16 +38,24 @@ def main():
         # 2. Initialize all modules with values retrieved from your config
         logger = Logger(log_dir)
         logger.log_info("Initializing Face Tracker System...")
-        
+
+        # CHANGE 1 - Smart source selection
+        use_rtsp = config.get("use_rtsp", False)
+        if use_rtsp:
+            video_source = config.get("rtsp_url", "")
+            logger.log_info(f"RTSP mode. Connecting: {video_source}")
+        else:
+            video_source = config.get("video_source", "sample.mp4")
+            logger.log_info(f"File mode. Opening: {video_source}")
+
         db_manager = DatabaseManager(db_path)
         detector = FaceDetector(confidence_threshold=detection_confidence)
         recognizer = FaceRecognizer()
         tracker = FaceTracker()
         counter = VisitorCounter(db_manager)
-        
-        # 3. Open the target video source using OpenCV VideoCapture
-        logger.log_info(f"Opening video source: {video_source}")
-        cap = cv2.VideoCapture(video_source)
+
+        # 3. Open the target video source using open_video_source()
+        cap = open_video_source(video_source, is_rtsp=use_rtsp)
         
         if not cap.isOpened():
             logger.log_info(f"Failed to open video source: {video_source}. Exiting.")
@@ -55,13 +70,14 @@ def main():
 
         output_path = config.get("output_video", "output.mp4")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(
-            output_path,
-            fourcc,
-            fps,
-            (frame_width, frame_height)
-        )
-        logger.log_info(f"Output video will be saved to: {output_path}")
+        # CHANGE 3 - Only create output video writer in file mode
+        if not use_rtsp:
+            out = cv2.VideoWriter(
+                output_path, fourcc, fps, (frame_width, frame_height))
+            logger.log_info(f"Output video: {output_path}")
+        else:
+            out = None
+            logger.log_info("RTSP mode - output video disabled")
         show_display = config.get("show_display", True)
 
         frame_number = 0
@@ -79,10 +95,34 @@ def main():
         
         # FIX 2 - Main loop with drawing and video writing
         while True:
-            # 1. Read frame
-            ret, frame = cap.read()
+            # 1. Read frame - CHANGE 4: RTSP-aware reading with reconnect
+            if use_rtsp:
+                cap.grab()
+                cap.grab()
+                ret, frame = cap.retrieve()
+            else:
+                ret, frame = cap.read()
+
             if not ret or frame is None:
-                break
+                if use_rtsp:
+                    logger.log_info("RTSP lost. Reconnecting...")
+                    cap.release()
+                    attempts = config.get("rtsp_reconnect_attempts", 3)
+                    reconnected = False
+                    for attempt in range(attempts):
+                        time.sleep(2)
+                        cap = open_video_source(video_source, True)
+                        if cap.isOpened():
+                            logger.log_info(
+                                f"Reconnected on attempt {attempt+1}")
+                            reconnected = True
+                            break
+                    if not reconnected:
+                        logger.log_info("Failed to reconnect. Exiting.")
+                        break
+                    continue
+                else:
+                    break
             frame_number += 1
             
             # 2. Detection block - runs every N frames only
@@ -265,9 +305,22 @@ def main():
                 (0, 255, 0),
                 2
             )
-            
-            # Write every frame to output video
-            out.write(display_frame)
+
+            # CHANGE 5 - LIVE indicator for RTSP mode
+            if use_rtsp:
+                cv2.putText(
+                    display_frame,
+                    "LIVE",
+                    (frame_width - 80, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 0, 255),
+                    2
+                )
+
+            # CHANGE 6 - Only write output video in file mode
+            if out is not None:
+                out.write(display_frame)
             
             # Show live window
             if show_display:
@@ -278,8 +331,9 @@ def main():
         # 5. Teardown
         cap.release()
         # FIX 3 - Release video writer and close windows
-        out.release()
-        logger.log_info(f"Output video saved to: {output_path}")
+        if out is not None:
+            out.release()
+            logger.log_info(f"Output video saved to: {output_path}")
         cv2.destroyAllWindows()
         total_unique = counter.get_unique_count()
         logger.log_info(f"Stream ended. Unique visitors: {total_unique}")
