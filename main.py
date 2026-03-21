@@ -93,6 +93,11 @@ def main():
         
         recently_registered = {}  # face_id -> frame_number
         
+        # Tracks faces currently inside the frame this session
+        session_entries = set()
+        # Tracks faces that have genuinely exited this session
+        session_exits = set()
+        
         # FIX 2 - Main loop with drawing and video writing
         while True:
             # 1. Read frame - CHANGE 4: RTSP-aware reading with reconnect
@@ -139,7 +144,23 @@ def main():
                            int(b[2]*scale_x), int(b[3]*scale_y)]
                           for b in bboxes]
                 
+                processed_bboxes = []
                 for bbox in bboxes:
+                    is_overlapping = False
+                    for prev_bbox in processed_bboxes:
+                        x_overlap = max(0, min(bbox[2], prev_bbox[2]) - 
+                                       max(bbox[0], prev_bbox[0]))
+                        y_overlap = max(0, min(bbox[3], prev_bbox[3]) - 
+                                       max(bbox[1], prev_bbox[1]))
+                        overlap_area = x_overlap * y_overlap
+                        bbox_area = (bbox[2]-bbox[0]) * (bbox[3]-bbox[1])
+                        if bbox_area > 0 and overlap_area/bbox_area > 0.5:
+                            is_overlapping = True
+                            break
+                    if is_overlapping:
+                        continue
+                    processed_bboxes.append(bbox)
+                    
                     try:
                         embedding = recognizer.get_embedding(frame, bbox)
                         if embedding is None:
@@ -163,7 +184,7 @@ def main():
                         if best_similarity > similarity_threshold and best_match_id is not None:
                             face_id = best_match_id
                             
-                            # Learn new angle if pose changed
+                            # Learn new pose angle
                             if best_similarity < 0.75:
                                 emb_bytes = recognizer.embedding_to_bytes(embedding)
                                 db_manager.insert_embedding(
@@ -172,13 +193,25 @@ def main():
                                     embedding_cache[face_id] = []
                                 embedding_cache[face_id].append(embedding)
                             
-                            # Log re-entry if face was not active
                             if not tracker.is_active(face_id):
-                                entry_img_path = logger.save_face_image(
-                                    frame, bbox, face_id, "entry")
-                                logger.log_entry(face_id, entry_img_path)
-                                db_manager.insert_event(
-                                    face_id, "entry", current_time, entry_img_path)
+                                # Only log re-entry if face genuinely exited before
+                                if face_id in session_exits:
+                                    session_exits.discard(face_id)
+                                    session_entries.add(face_id)
+                                    entry_img = logger.save_face_image(
+                                        frame, bbox, face_id, "entry")
+                                    logger.log_entry(face_id, entry_img)
+                                    db_manager.insert_event(
+                                        face_id, "entry", current_time, entry_img)
+                                elif face_id not in session_entries:
+                                    session_entries.add(face_id)
+                                    entry_img = logger.save_face_image(
+                                        frame, bbox, face_id, "entry")
+                                    logger.log_entry(face_id, entry_img)
+                                    db_manager.insert_event(
+                                        face_id, "entry", current_time, entry_img)
+                            
+                            tracker.update(face_id, bbox, frame_number)
                         
                         else:
                             # Check cooldown for duplicates
@@ -198,19 +231,21 @@ def main():
                                 face_id = str(uuid.uuid4())[:8]
                                 recently_registered[face_id] = frame_number
                                 emb_bytes = recognizer.embedding_to_bytes(embedding)
-                                db_manager.insert_face(
-                                    face_id, emb_bytes, current_time)
-                                db_manager.insert_embedding(
-                                    face_id, emb_bytes, current_time)
+                                db_manager.insert_face(face_id, emb_bytes, current_time)
+                                db_manager.insert_embedding(face_id, emb_bytes, current_time)
                                 if face_id not in embedding_cache:
                                     embedding_cache[face_id] = []
                                 embedding_cache[face_id].append(embedding)
                                 logger.log_register(face_id)
-                                entry_img_path = logger.save_face_image(
-                                    frame, bbox, face_id, "entry")
-                                logger.log_entry(face_id, entry_img_path)
-                                db_manager.insert_event(
-                                    face_id, "entry", current_time, entry_img_path)
+                                
+                                if face_id not in session_entries:
+                                    entry_img = logger.save_face_image(
+                                        frame, bbox, face_id, "entry")
+                                    logger.log_entry(face_id, entry_img)
+                                    db_manager.insert_event(
+                                        face_id, "entry", current_time, entry_img)
+                                    session_entries.add(face_id)
+                                
                                 counter.register_new_face(face_id)
                                 tracker.update(face_id, bbox, frame_number)
                             else:
@@ -233,17 +268,20 @@ def main():
                 frame_number, exit_timeout_frames)
             for exit_id in exited_ids:
                 try:
-                    last_bbox = tracker.active_tracks[exit_id]['bbox']
-                    exit_img_path = logger.save_face_image(
-                        frame, last_bbox, exit_id, "exit")
-                    logger.log_exit(exit_id, exit_img_path)
-                    current_time = datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S")
-                    db_manager.insert_event(
-                        exit_id, "exit", current_time, exit_img_path)
+                    # Only log exit if face was actually entered
+                    if exit_id in session_entries:
+                        last_bbox = tracker.active_tracks[exit_id]['bbox']
+                        exit_img = logger.save_face_image(
+                            frame, last_bbox, exit_id, "exit")
+                        logger.log_exit(exit_id, exit_img)
+                        current_time = datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S")
+                        db_manager.insert_event(
+                            exit_id, "exit", current_time, exit_img)
+                        session_entries.discard(exit_id)
+                        session_exits.add(exit_id)
                 except Exception as exit_e:
-                    logger.log_info(
-                        f"Exit error for {exit_id}: {exit_e}")
+                    logger.log_info(f"Exit error {exit_id}: {exit_e}")
             
             # 4. Draw boxes and write output - runs every frame
             display_frame = frame.copy()
