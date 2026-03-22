@@ -1,0 +1,35 @@
+2026-03-21 23:31:37 | INFO | Initializing Face Tracker System...
+2026-03-21 23:31:37 | INFO | File mode. Opening: sample.mp4
+2026-03-21 23:31:39 | INFO | Output video: output.mp4
+2026-03-21 23:33:23 | INFO | REGISTER | face_id=0c85179b
+2026-03-21 23:33:23 | INFO | ENTRY | face_id=0c85179b | image=logs/entries/2026-03-21/0c85179b_23-33-23.jpg
+2026-03-21 23:33:55 | INFO | REGISTER | face_id=740fec41
+2026-03-21 23:33:55 | INFO | ENTRY | face_id=740fec41 | image=logs/entries/2026-03-21/740fec41_23-33-55.jpg
+2026-03-21 23:34:38 | INFO | EXIT | face_id=740fec41 | image=logs/exits/2026-03-21/740fec41_23-34-38.jpg
+2026-03-21 23:34:42 | INFO | EXIT | face_id=0c85179b | image=logs/exits/2026-03-21/0c85179b_23-34-42.jpg
+2026-03-21 23:35:38 | INFO | REGISTER | face_id=a514219a
+2026-03-21 23:35:38 | INFO | ENTRY | face_id=a514219a | image=logs/entries/2026-03-21/a514219a_23-35-38.jpg
+2026-03-21 23:36:20 | INFO | REGISTER | face_id=856c5177
+2026-03-21 23:36:20 | INFO | ENTRY | face_id=856c5177 | image=logs/entries/2026-03-21/856c5177_23-36-20.jpg
+2026-03-21 23:38:15 | INFO | EXIT | face_id=a514219a | image=logs/exits/2026-03-21/a514219a_23-38-15.jpg
+2026-03-21 23:38:17 | INFO | EXIT | face_id=856c5177 | image=logs/exits/2026-03-21/856c5177_23-38-17.jpg
+2026-03-21 23:38:36 | INFO | REGISTER | face_id=8eef3c41
+2026-03-21 23:38:36 | INFO | ENTRY | face_id=8eef3c41 | image=logs/entries/2026-03-21/8eef3c41_23-38-36.jpg
+2026-03-21 23:39:13 | INFO | REGISTER | face_id=a9d49935
+2026-03-21 23:39:13 | INFO | ENTRY | face_id=a9d49935 | image=logs/entries/2026-03-21/a9d49935_23-39-13.jpg
+2026-03-21 23:39:17 | INFO | REGISTER | face_id=c44cd3b1
+2026-03-21 23:39:17 | INFO | ENTRY | face_id=c44cd3b1 | image=logs/entries/2026-03-21/c44cd3b1_23-39-17.jpg
+2026-03-21 23:39:23 | INFO | EXIT | face_id=8eef3c41 | image=logs/exits/2026-03-21/8eef3c41_23-39-23.jpg
+2026-03-21 23:40:12 | INFO | REGISTER | face_id=5137062a
+2026-03-21 23:40:12 | INFO | ENTRY | face_id=5137062a | image=logs/entries/2026-03-21/5137062a_23-40-12.jpg
+2026-03-21 23:40:56 | INFO | REGISTER | face_id=38f07d17
+2026-03-21 23:40:56 | INFO | ENTRY | face_id=38f07d17 | image=logs/entries/2026-03-21/38f07d17_23-40-56.jpg
+2026-03-21 23:41:24 | INFO | REGISTER | face_id=15e48209
+2026-03-21 23:41:24 | INFO | ENTRY | face_id=15e48209 | image=logs/entries/2026-03-21/15e48209_23-41-24.jpg
+2026-03-21 23:41:35 | INFO | EXIT | face_id=a9d49935 | image=logs/exits/2026-03-21/a9d49935_23-41-35.jpg
+2026-03-21 23:41:35 | INFO | EXIT | face_id=c44cd3b1 | image=logs/exits/2026-03-21/c44cd3b1_23-41-35.jpg
+2026-03-21 23:41:52 | INFO | EXIT | face_id=5137062a | image=logs/exits/2026-03-21/5137062a_23-41-52.jpg
+2026-03-21 23:41:55 | INFO | EXIT | face_id=15e48209 | image=logs/exits/2026-03-21/15e48209_23-41-55.jpg
+2026-03-21 23:42:00 | INFO | EXIT | face_id=38f07d17 | image=logs/exits/2026-03-21/38f07d17_23-42-00.jpg
+2026-03-21 23:42:01 | INFO | Output video saved to: output.mp4
+2026-03-21 23:42:01 | INFO | Stream ended. Unique visitors: 10
